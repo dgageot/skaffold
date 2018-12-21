@@ -18,14 +18,11 @@ package runner
 
 import (
 	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/schema/latest"
-	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/sync"
 	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/watch"
 )
 
 type changes struct {
 	dirtyArtifacts []*artifactChange
-	needsRebuild   []*latest.Artifact
-	needsResync    []*sync.Item
 	needsRedeploy  bool
 	needsReload    bool
 }
@@ -36,22 +33,14 @@ type artifactChange struct {
 }
 
 func (c *changes) AddDirtyArtifact(a *latest.Artifact, e watch.Events) {
-	c.dirtyArtifacts = append(c.dirtyArtifacts, &artifactChange{artifact: a, events: e})
-}
-
-func (c *changes) AddRebuild(a *latest.Artifact) {
-	c.needsRebuild = append(c.needsRebuild, a)
-}
-
-func (c *changes) AddResync(s *sync.Item) {
-	c.needsResync = append(c.needsResync, s)
+	c.dirtyArtifacts = append(c.dirtyArtifacts, &artifactChange{
+		artifact: a,
+		events:   e,
+	})
 }
 
 func (c *changes) reset() {
 	c.dirtyArtifacts = nil
-	c.needsRebuild = nil
-	c.needsResync = nil
-
 	c.needsRedeploy = false
 	c.needsReload = false
 }

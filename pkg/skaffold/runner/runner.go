@@ -192,6 +192,10 @@ func getTagger(t latest.TagPolicy, customTag string) (tag.Tagger, error) {
 	}
 }
 
+func (r *SkaffoldRunner) configurationFiles() ([]string, error) {
+	return []string{r.opts.ConfigurationFile}, nil
+}
+
 func (r *SkaffoldRunner) newLogger(out io.Writer, artifacts []*latest.Artifact) *kubernetes.LogAggregator {
 	var imageNames []string
 	for _, artifact := range artifacts {

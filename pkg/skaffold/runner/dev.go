@@ -45,36 +45,38 @@ func (r *SkaffoldRunner) Dev(ctx context.Context, out io.Writer, artifacts []*la
 
 		logger.Mute()
 
-		for _, a := range changed.dirtyArtifacts {
-			s, err := sync.NewItem(a.artifact, a.events, r.builds)
-			if err != nil {
-				return errors.Wrap(err, "sync")
-			}
-			if s != nil {
-				changed.AddResync(s)
-			} else {
-				changed.AddRebuild(a.artifact)
-			}
-		}
-
 		switch {
 		case changed.needsReload:
 			logger.Stop()
 			return ErrorConfigurationChanged
-		case len(changed.needsResync) > 0:
-			for _, s := range changed.needsResync {
-				color.Default.Fprintf(out, "Syncing %d files for %s\n", len(s.Copy)+len(s.Delete), s.Image)
+		case len(changed.dirtyArtifacts) > 0:
+			var needsRebuild []*latest.Artifact
 
-				if err := r.Syncer.Sync(ctx, s); err != nil {
-					logrus.Warnln("Skipping deploy due to sync error:", err)
+			for _, a := range changed.dirtyArtifacts {
+				s, err := sync.NewItem(a.artifact, a.events, r.builds)
+				if err != nil {
+					return errors.Wrap(err, "sync")
+				}
+
+				if s != nil {
+					color.Default.Fprintf(out, "Syncing %d files for %s\n", len(s.Copy)+len(s.Delete), s.Image)
+
+					if err := r.Syncer.Sync(ctx, s); err != nil {
+						logrus.Warnln("Skipping deploy due to sync error:", err)
+						return nil // TODO(dgageot): Shouldn't we build the artifacts that need to be built?
+					}
+				} else {
+					needsRebuild = append(needsRebuild, a.artifact)
+				}
+			}
+
+			if len(needsRebuild) > 0 {
+				if err := r.buildTestDeploy(ctx, out, needsRebuild); err != nil {
+					logrus.Warnln("Skipping deploy due to error:", err)
 					return nil
 				}
 			}
-		case len(changed.needsRebuild) > 0:
-			if err := r.buildTestDeploy(ctx, out, changed.needsRebuild); err != nil {
-				logrus.Warnln("Skipping deploy due to error:", err)
-				return nil
-			}
+
 		case changed.needsRedeploy:
 			if _, err := r.Deploy(ctx, out, r.builds); err != nil {
 				logrus.Warnln("Skipping deploy due to error:", err)
@@ -89,7 +91,6 @@ func (r *SkaffoldRunner) Dev(ctx context.Context, out io.Writer, artifacts []*la
 	// Watch artifacts
 	for i := range artifacts {
 		artifact := artifacts[i]
-
 		if !r.shouldWatch(artifact) {
 			continue
 		}
@@ -104,7 +105,7 @@ func (r *SkaffoldRunner) Dev(ctx context.Context, out io.Writer, artifacts []*la
 
 	// Watch test configuration
 	if err := r.Watcher.Register(
-		func() ([]string, error) { return r.TestDependencies() },
+		r.TestDependencies,
 		func(watch.Events) { changed.needsRedeploy = true },
 	); err != nil {
 		return errors.Wrap(err, "watching test files")
@@ -112,7 +113,7 @@ func (r *SkaffoldRunner) Dev(ctx context.Context, out io.Writer, artifacts []*la
 
 	// Watch deployment configuration
 	if err := r.Watcher.Register(
-		func() ([]string, error) { return r.Dependencies() },
+		r.Dependencies,
 		func(watch.Events) { changed.needsRedeploy = true },
 	); err != nil {
 		return errors.Wrap(err, "watching files for deployer")
@@ -120,7 +121,7 @@ func (r *SkaffoldRunner) Dev(ctx context.Context, out io.Writer, artifacts []*la
 
 	// Watch Skaffold configuration
 	if err := r.Watcher.Register(
-		func() ([]string, error) { return []string{r.opts.ConfigurationFile}, nil },
+		r.configurationFiles,
 		func(watch.Events) { changed.needsReload = true },
 	); err != nil {
 		return errors.Wrapf(err, "watching skaffold configuration %s", r.opts.ConfigurationFile)
