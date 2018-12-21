@@ -55,15 +55,18 @@ func (r *SkaffoldRunner) Dev(ctx context.Context, out io.Writer, artifacts []*la
 			for _, a := range changed.dirtyArtifacts {
 				s, err := sync.NewItem(a.artifact, a.events, r.builds)
 				if err != nil {
+					// TODO: should trigger a rebuild with a warning
 					return errors.Wrap(err, "sync")
 				}
 
 				if s != nil {
+					// TODO: move to Sync()
 					color.Default.Fprintf(out, "Syncing %d files for %s\n", len(s.Copy)+len(s.Delete), s.Image)
 
 					if err := r.Syncer.Sync(ctx, s); err != nil {
-						logrus.Warnln("Skipping deploy due to sync error:", err)
-						return nil // TODO(dgageot): Shouldn't we build the artifacts that need to be built?
+						// TODO: should trigger a rebuild with a warning
+						logrus.Warnln("Skipping deploy due to sync error:", err) // TODO: wrong error message
+						return nil                                               // TODO(dgageot): Shouldn't we build the artifacts that need to be built?
 					}
 				} else {
 					needsRebuild = append(needsRebuild, a.artifact)
