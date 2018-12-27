@@ -24,9 +24,7 @@ import (
 	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/build"
 	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/build/tag"
 	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/color"
-	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/docker"
 	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/schema/latest"
-	"github.com/pkg/errors"
 )
 
 // Build runs a docker build on the host and tags the resulting image with
@@ -38,75 +36,24 @@ func (b *Builder) Build(ctx context.Context, out io.Writer, tagger tag.Tagger, a
 	defer b.localDocker.Close()
 
 	// TODO(dgageot): parallel builds
-	return build.InSequence(ctx, out, tagger, artifacts, b.buildArtifact)
+	return build.InSequence(ctx, out, tagger, artifacts, b.buildArtifactLocally)
 }
 
-func (b *Builder) buildArtifact(ctx context.Context, out io.Writer, tagger tag.Tagger, artifact *latest.Artifact) (string, error) {
-	digest, err := b.runBuildForArtifact(ctx, out, artifact)
-	if err != nil {
-		return "", errors.Wrap(err, "build artifact")
-	}
-
-	if b.alreadyTagged == nil {
-		b.alreadyTagged = make(map[string]string)
-	}
-	if tag, present := b.alreadyTagged[digest]; present {
-		return tag, nil
-	}
-
-	tag, err := tagger.GenerateFullyQualifiedImageName(artifact.Workspace, tag.Options{
-		ImageName: artifact.ImageName,
-		Digest:    digest,
-	})
-	if err != nil {
-		return "", errors.Wrap(err, "generating tag")
-	}
-
-	if err := b.retagAndPush(ctx, out, digest, tag, artifact); err != nil {
-		return "", errors.Wrap(err, "tagging")
-	}
-
-	b.alreadyTagged[digest] = tag
-
-	return tag, nil
-}
-
-func (b *Builder) runBuildForArtifact(ctx context.Context, out io.Writer, artifact *latest.Artifact) (string, error) {
+func (b *Builder) buildArtifactLocally(ctx context.Context, out io.Writer, artifact *latest.Artifact, fqn string) (string, error) {
 	switch {
 	case artifact.DockerArtifact != nil:
-		return b.buildDocker(ctx, out, artifact.Workspace, artifact.DockerArtifact)
+		return b.buildDocker(ctx, out, artifact.Workspace, artifact.DockerArtifact, fqn)
 
 	case artifact.BazelArtifact != nil:
-		return b.buildBazel(ctx, out, artifact.Workspace, artifact.BazelArtifact)
+		return b.buildBazel(ctx, out, artifact.Workspace, artifact.BazelArtifact, fqn)
 
 	case artifact.JibMavenArtifact != nil:
-		return b.buildJibMaven(ctx, out, artifact.Workspace, artifact)
+		return b.buildJibMaven(ctx, out, artifact.Workspace, artifact.JibMavenArtifact, fqn)
 
 	case artifact.JibGradleArtifact != nil:
-		return b.buildJibGradle(ctx, out, artifact.Workspace, artifact)
+		return b.buildJibGradle(ctx, out, artifact.Workspace, artifact.JibGradleArtifact, fqn)
 
 	default:
 		return "", fmt.Errorf("undefined artifact type: %+v", artifact.ArtifactType)
 	}
-}
-
-func (b *Builder) retagAndPush(ctx context.Context, out io.Writer, initialTag string, newTag string, artifact *latest.Artifact) error {
-	if b.pushImages && (artifact.JibMavenArtifact != nil || artifact.JibGradleArtifact != nil) {
-		if err := docker.AddTag(initialTag, newTag); err != nil {
-			return errors.Wrap(err, "tagging image")
-		}
-		return nil
-	}
-
-	if err := b.localDocker.Tag(ctx, initialTag, newTag); err != nil {
-		return err
-	}
-
-	if b.pushImages {
-		if _, err := b.localDocker.Push(ctx, out, newTag); err != nil {
-			return errors.Wrap(err, "pushing")
-		}
-	}
-
-	return nil
 }

@@ -30,7 +30,7 @@ import (
 
 const bufferedLinesPerArtifact = 10000
 
-type artifactBuilder func(ctx context.Context, out io.Writer, tagger tag.Tagger, artifact *latest.Artifact) (string, error)
+type artifactBuilder func(ctx context.Context, out io.Writer, artifact *latest.Artifact, fqn string) (string, error)
 
 // InParallel builds a list of artifacts in parallel but prints the logs in sequential order.
 func InParallel(ctx context.Context, out io.Writer, tagger tag.Tagger, artifacts []*latest.Artifact, buildArtifact artifactBuilder) ([]Artifact, error) {
@@ -52,13 +52,17 @@ func InParallel(ctx context.Context, out io.Writer, tagger tag.Tagger, artifacts
 		lines := make(chan (string), bufferedLinesPerArtifact)
 		outputs[i] = lines
 
-		r, w := io.Pipe()
+		fqn, err := tagger.GenerateFullyQualifiedImageName(artifacts[i].Workspace, artifacts[i].ImageName)
+		if err != nil {
+			return nil, errors.Wrap(err, "generating tag")
+		}
 
+		r, w := io.Pipe()
 		go func() {
 			// Log to the pipe, output will be collected and printed later
 			fmt.Fprintf(w, "Building [%s]...\n", artifacts[i].ImageName)
 
-			tags[i], errs[i] = buildArtifact(ctx, w, tagger, artifacts[i])
+			tags[i], errs[i] = buildArtifact(ctx, w, artifacts[i], fqn)
 			w.Close()
 		}()
 

@@ -29,38 +29,33 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (b *Builder) buildJibGradle(ctx context.Context, out io.Writer, workspace string, artifact *latest.Artifact) (string, error) {
+func (b *Builder) buildJibGradle(ctx context.Context, out io.Writer, workspace string, artifact *latest.JibGradleArtifact, fqn string) (string, error) {
 	if b.pushImages {
-		return b.buildJibGradleToRegistry(ctx, out, workspace, artifact)
+		return b.buildJibGradleToRegistry(ctx, out, workspace, artifact, fqn)
 	}
-	return b.buildJibGradleToDocker(ctx, out, workspace, artifact.JibGradleArtifact)
+	return b.buildJibGradleToDocker(ctx, out, workspace, artifact, fqn)
 }
 
-func (b *Builder) buildJibGradleToDocker(ctx context.Context, out io.Writer, workspace string, artifact *latest.JibGradleArtifact) (string, error) {
-	skaffoldImage := generateJibImageRef(workspace, artifact.Project)
-	args := generateGradleArgs("jibDockerBuild", skaffoldImage, artifact)
-
+func (b *Builder) buildJibGradleToDocker(ctx context.Context, out io.Writer, workspace string, artifact *latest.JibGradleArtifact, fqn string) (string, error) {
+	args := generateGradleArgs("jibDockerBuild", artifact, fqn)
 	if err := runGradleCommand(ctx, out, workspace, args); err != nil {
 		return "", err
 	}
 
-	return b.localDocker.ImageID(ctx, skaffoldImage)
+	return fqn, nil
 }
 
-func (b *Builder) buildJibGradleToRegistry(ctx context.Context, out io.Writer, workspace string, artifact *latest.Artifact) (string, error) {
-	initialTag := util.RandomID()
-	skaffoldImage := fmt.Sprintf("%s:%s", artifact.ImageName, initialTag)
-	args := generateGradleArgs("jib", skaffoldImage, artifact.JibGradleArtifact)
-
+func (b *Builder) buildJibGradleToRegistry(ctx context.Context, out io.Writer, workspace string, artifact *latest.JibGradleArtifact, fqn string) (string, error) {
+	args := generateGradleArgs("jib", artifact, fqn)
 	if err := runGradleCommand(ctx, out, workspace, args); err != nil {
 		return "", err
 	}
 
-	return docker.RemoteDigest(skaffoldImage)
+	return docker.FullRemoteReference(fqn)
 }
 
 // generateGradleArgs generates the arguments to Gradle for building the project as an image called `skaffoldImage`.
-func generateGradleArgs(task string, imageName string, artifact *latest.JibGradleArtifact) []string {
+func generateGradleArgs(task string, artifact *latest.JibGradleArtifact, fqn string) []string {
 	var command string
 	if artifact.Project == "" {
 		command = ":" + task
@@ -69,7 +64,7 @@ func generateGradleArgs(task string, imageName string, artifact *latest.JibGradl
 		command = fmt.Sprintf(":%s:%s", artifact.Project, task)
 	}
 
-	return []string{command, "--image=" + imageName}
+	return []string{command, "--image=" + fqn}
 }
 
 func runGradleCommand(ctx context.Context, out io.Writer, workspace string, args []string) error {

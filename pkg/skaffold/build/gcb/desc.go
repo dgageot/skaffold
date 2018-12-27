@@ -22,7 +22,7 @@ import (
 	cloudbuild "google.golang.org/api/cloudbuild/v1"
 )
 
-func (b *Builder) buildDescription(artifact *latest.Artifact, bucket, object string) *cloudbuild.Build {
+func (b *Builder) buildDescription(artifact *latest.Artifact, fqn, bucket, object string) *cloudbuild.Build {
 	var steps []*cloudbuild.BuildStep
 
 	for _, cacheFrom := range artifact.DockerArtifact.CacheFrom {
@@ -32,7 +32,7 @@ func (b *Builder) buildDescription(artifact *latest.Artifact, bucket, object str
 		})
 	}
 
-	args := append([]string{"build", "--tag", artifact.ImageName, "-f", artifact.DockerArtifact.DockerfilePath})
+	args := append([]string{"build", "--tag", fqn, "-f", artifact.DockerArtifact.DockerfilePath})
 	args = append(args, docker.GetBuildArgs(artifact.DockerArtifact)...)
 	args = append(args, ".")
 
@@ -50,7 +50,7 @@ func (b *Builder) buildDescription(artifact *latest.Artifact, bucket, object str
 			},
 		},
 		Steps:  steps,
-		Images: []string{artifact.ImageName},
+		Images: []string{fqn},
 		Options: &cloudbuild.BuildOptions{
 			DiskSizeGb:  b.DiskSizeGb,
 			MachineType: b.MachineType,

@@ -17,6 +17,7 @@ limitations under the License.
 package docker
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -58,6 +59,17 @@ func addTag(ref name.Reference, targetRef name.Reference, auth authn.Authenticat
 	}
 
 	return remote.Write(targetRef, img, auth, t)
+}
+
+// FullRemoteReference returns a full remote image reference in the form
+// ref@sha256:digest
+func FullRemoteReference(ref string) (string, error) {
+	digest, err := RemoteDigest(ref)
+	if err != nil {
+		return "", errors.Wrap(err, "getting remote digest")
+	}
+
+	return fmt.Sprintf("%s@%s", ref, digest), nil
 }
 
 func RemoteDigest(identifier string) (string, error) {

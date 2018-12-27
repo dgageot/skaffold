@@ -28,23 +28,20 @@ func TestEnvTemplateTagger_GenerateFullyQualifiedImageName(t *testing.T) {
 		name      string
 		template  string
 		imageName string
-		digest    string
 		env       []string
 		expected  string
 	}{
 		{
-			name:      "empty env",
+			name:      "empty env with digest (deprecated)",
 			template:  "{{.IMAGE_NAME}}:{{.DIGEST}}",
 			imageName: "foo",
-			digest:    "bar",
-			expected:  "foo:bar",
+			expected:  "foo",
 		},
 		{
 			name:      "env",
 			template:  "{{.FOO}}-{{.BAZ}}:latest",
 			env:       []string{"FOO=BAR", "BAZ=BAT"},
 			imageName: "foo",
-			digest:    "bar",
 			expected:  "BAR-BAT:latest",
 		},
 		{
@@ -52,15 +49,13 @@ func TestEnvTemplateTagger_GenerateFullyQualifiedImageName(t *testing.T) {
 			template:  "{{.IMAGE_NAME}}-{{.FROM_ENV}}:latest",
 			env:       []string{"FROM_ENV=FOO", "IMAGE_NAME=BAT"},
 			imageName: "image_name",
-			digest:    "bar",
 			expected:  "image_name-FOO:latest",
 		},
 		{
-			name:      "digest algo hex",
+			name:      "digest algo hex (deprecated)",
 			template:  "{{.IMAGE_NAME}}:{{.DIGEST_ALGO}}-{{.DIGEST_HEX}}",
 			imageName: "foo",
-			digest:    "sha256:abcd",
-			expected:  "foo:sha256-abcd",
+			expected:  "foo",
 		},
 	}
 	for _, test := range tests {
@@ -72,10 +67,7 @@ func TestEnvTemplateTagger_GenerateFullyQualifiedImageName(t *testing.T) {
 			c, err := NewEnvTemplateTagger(test.template)
 			testutil.CheckError(t, false, err)
 
-			got, err := c.GenerateFullyQualifiedImageName("", Options{
-				ImageName: test.imageName,
-				Digest:    test.digest,
-			})
+			got, err := c.GenerateFullyQualifiedImageName("", test.imageName)
 
 			testutil.CheckErrorAndDeepEqual(t, false, err, test.expected, got)
 		})

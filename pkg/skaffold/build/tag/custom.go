@@ -34,11 +34,10 @@ func (c *CustomTag) Labels() map[string]string {
 }
 
 // GenerateFullyQualifiedImageName tags an image with the custom tag
-func (c *CustomTag) GenerateFullyQualifiedImageName(workingDir string, opts Options) (string, error) {
-	tag := c.Tag
-	if tag == "" {
+func (c *CustomTag) GenerateFullyQualifiedImageName(workingDir string, imageName string) (string, error) {
+	if c.Tag == "" {
 		return "", errors.New("custom tag not provided")
 	}
 
-	return fmt.Sprintf("%s:%s", opts.ImageName, tag), nil
+	return fmt.Sprintf("%s:%s", imageName, c.Tag), nil
 }

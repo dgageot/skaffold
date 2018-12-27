@@ -27,7 +27,6 @@ import (
 
 func TestBuildDescription(t *testing.T) {
 	artifact := &latest.Artifact{
-		ImageName: "nginx",
 		ArtifactType: latest.ArtifactType{
 			DockerArtifact: &latest.DockerArtifact{
 				DockerfilePath: "Dockerfile",
@@ -47,7 +46,7 @@ func TestBuildDescription(t *testing.T) {
 			Timeout:     "10m",
 		},
 	}
-	desc := builder.buildDescription(artifact, "bucket", "object")
+	desc := builder.buildDescription(artifact, "nginx", "bucket", "object")
 
 	expected := cloudbuild.Build{
 		LogsBucket: "bucket",
@@ -61,7 +60,7 @@ func TestBuildDescription(t *testing.T) {
 			Name: "docker/docker",
 			Args: []string{"build", "--tag", "nginx", "-f", "Dockerfile", "--build-arg", "arg1=value1", "--build-arg", "arg2", "."},
 		}},
-		Images: []string{artifact.ImageName},
+		Images: []string{"nginx"},
 		Options: &cloudbuild.BuildOptions{
 			DiskSizeGb:  100,
 			MachineType: "n1-standard-1",
@@ -74,7 +73,6 @@ func TestBuildDescription(t *testing.T) {
 
 func TestPullCacheFrom(t *testing.T) {
 	artifact := &latest.Artifact{
-		ImageName: "nginx",
 		ArtifactType: latest.ArtifactType{
 			DockerArtifact: &latest.DockerArtifact{
 				DockerfilePath: "Dockerfile",
@@ -88,7 +86,7 @@ func TestPullCacheFrom(t *testing.T) {
 			DockerImage: "docker/docker",
 		},
 	}
-	desc := builder.buildDescription(artifact, "bucket", "object")
+	desc := builder.buildDescription(artifact, "img:tag", "bucket", "object")
 
 	expected := []*cloudbuild.BuildStep{{
 		Name: "docker/docker",
@@ -98,7 +96,7 @@ func TestPullCacheFrom(t *testing.T) {
 		Args: []string{"pull", "from/image2"},
 	}, {
 		Name: "docker/docker",
-		Args: []string{"build", "--tag", "nginx", "-f", "Dockerfile", "--cache-from", "from/image1", "--cache-from", "from/image2", "."},
+		Args: []string{"build", "--tag", "img:tag", "-f", "Dockerfile", "--cache-from", "from/image1", "--cache-from", "from/image2", "."},
 	}}
 
 	testutil.CheckDeepEqual(t, expected, desc.Steps)

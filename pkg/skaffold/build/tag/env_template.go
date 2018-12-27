@@ -17,7 +17,6 @@ limitations under the License.
 package tag
 
 import (
-	"strings"
 	"text/template"
 
 	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/constants"
@@ -36,6 +35,7 @@ func NewEnvTemplateTagger(t string) (Tagger, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing template")
 	}
+
 	return &envTemplateTagger{
 		Template: tmpl,
 	}, nil
@@ -48,25 +48,8 @@ func (t *envTemplateTagger) Labels() map[string]string {
 }
 
 // GenerateFullyQualifiedImageName tags an image with the custom tag
-func (t *envTemplateTagger) GenerateFullyQualifiedImageName(workingDir string, opts Options) (string, error) {
-	customMap := CreateEnvVarMap(opts.ImageName, opts.Digest)
-	return util.ExecuteEnvTemplate(t.Template, customMap)
-}
-
-// CreateEnvVarMap creates a set of environment variables for use in Templates from the given
-// image name and digest
-func CreateEnvVarMap(imageName string, digest string) map[string]string {
-	customMap := map[string]string{}
-	customMap["IMAGE_NAME"] = imageName
-	customMap["DIGEST"] = digest
-	if digest != "" {
-		names := strings.SplitN(digest, ":", 2)
-		if len(names) >= 2 {
-			customMap["DIGEST_ALGO"] = names[0]
-			customMap["DIGEST_HEX"] = names[1]
-		} else {
-			customMap["DIGEST_HEX"] = digest
-		}
-	}
-	return customMap
+func (t *envTemplateTagger) GenerateFullyQualifiedImageName(workingDir string, imageName string) (string, error) {
+	return util.ExecuteEnvTemplate(t.Template, map[string]string{
+		"IMAGE_NAME": imageName,
+	})
 }

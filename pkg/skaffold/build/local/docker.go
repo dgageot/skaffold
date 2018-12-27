@@ -18,6 +18,7 @@ package local
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -28,16 +29,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (b *Builder) buildDocker(ctx context.Context, out io.Writer, workspace string, a *latest.DockerArtifact) (string, error) {
-	initialTag := util.RandomID()
-
+func (b *Builder) buildDocker(ctx context.Context, out io.Writer, workspace string, a *latest.DockerArtifact, fqn string) (string, error) {
 	if b.cfg.UseDockerCLI || b.cfg.UseBuildkit {
 		dockerfilePath, err := docker.NormalizeDockerfilePath(workspace, a.DockerfilePath)
 		if err != nil {
 			return "", errors.Wrap(err, "normalizing dockerfile path")
 		}
 
-		args := []string{"build", workspace, "--file", dockerfilePath, "-t", initialTag}
+		args := []string{"build", workspace, "--file", dockerfilePath, "-t", fqn}
 		args = append(args, docker.GetBuildArgs(a)...)
 
 		cmd := exec.CommandContext(ctx, "docker", args...)
@@ -50,9 +49,20 @@ func (b *Builder) buildDocker(ctx context.Context, out io.Writer, workspace stri
 		if err := util.RunCmd(cmd); err != nil {
 			return "", errors.Wrap(err, "running build")
 		}
-
-		return b.localDocker.ImageID(ctx, initialTag)
+	} else {
+		if _, err := b.localDocker.Build(ctx, out, workspace, a, fqn); err != nil {
+			return "", errors.Wrap(err, "running build")
+		}
 	}
 
-	return b.localDocker.Build(ctx, out, workspace, a, initialTag)
+	if b.pushImages {
+		digest, err := b.localDocker.Push(ctx, out, fqn)
+		if err != nil {
+			return "", errors.Wrap(err, "pushing image")
+		}
+
+		return fmt.Sprintf("%s@%s", fqn, digest), nil
+	}
+
+	return fqn, nil
 }

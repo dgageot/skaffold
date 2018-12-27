@@ -47,7 +47,7 @@ func (b *Builder) Build(ctx context.Context, out io.Writer, tagger tag.Tagger, a
 	return build.InParallel(ctx, out, tagger, artifacts, b.buildArtifactWithCloudBuild)
 }
 
-func (b *Builder) buildArtifactWithCloudBuild(ctx context.Context, out io.Writer, tagger tag.Tagger, artifact *latest.Artifact) (string, error) {
+func (b *Builder) buildArtifactWithCloudBuild(ctx context.Context, out io.Writer, artifact *latest.Artifact, fqn string) (string, error) {
 	client, err := google.DefaultClient(ctx, cloudbuild.CloudPlatformScope)
 	if err != nil {
 		return "", errors.Wrap(err, "getting google client")
@@ -90,7 +90,7 @@ func (b *Builder) buildArtifactWithCloudBuild(ctx context.Context, out io.Writer
 		return "", errors.Wrap(err, "uploading source tarball")
 	}
 
-	desc := b.buildDescription(artifact, cbBucket, buildObject)
+	desc := b.buildDescription(artifact, fqn, cbBucket, buildObject)
 	call := cbclient.Projects.Builds.Create(projectID, desc)
 	op, err := call.Context(ctx).Do()
 	if err != nil {
@@ -147,22 +147,8 @@ watch:
 		return "", errors.Wrap(err, "cleaning up source tar after build")
 	}
 	logrus.Infof("Deleted object %s", buildObject)
-	builtTag := fmt.Sprintf("%s@%s", artifact.ImageName, digest)
-	logrus.Infof("Image built at %s", builtTag)
 
-	newTag, err := tagger.GenerateFullyQualifiedImageName(artifact.Workspace, tag.Options{
-		ImageName: artifact.ImageName,
-		Digest:    digest,
-	})
-	if err != nil {
-		return "", errors.Wrap(err, "generating tag")
-	}
-
-	if err := docker.AddTag(builtTag, newTag); err != nil {
-		return "", errors.Wrap(err, "tagging image")
-	}
-
-	return newTag, nil
+	return fmt.Sprintf("%s@%s", fqn, digest), nil
 }
 
 func getBuildID(op *cloudbuild.Operation) (string, error) {

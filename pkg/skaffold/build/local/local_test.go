@@ -35,7 +35,7 @@ type FakeTagger struct {
 	Err error
 }
 
-func (f *FakeTagger) GenerateFullyQualifiedImageName(workingDir string, tagOpts tag.Options) (string, error) {
+func (f *FakeTagger) GenerateFullyQualifiedImageName(string, string) (string, error) {
 	return f.Out, f.Err
 }
 
@@ -152,6 +152,7 @@ func TestLocalRun(t *testing.T) {
 			}
 
 			res, err := l.Build(context.Background(), ioutil.Discard, test.tagger, test.artifacts)
+
 			testutil.CheckErrorAndDeepEqual(t, test.shouldErr, err, test.expected, res)
 		})
 	}

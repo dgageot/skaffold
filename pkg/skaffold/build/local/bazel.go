@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (b *Builder) buildBazel(ctx context.Context, out io.Writer, workspace string, a *latest.BazelArtifact) (string, error) {
+func (b *Builder) buildBazel(ctx context.Context, out io.Writer, workspace string, a *latest.BazelArtifact, fqn string) (string, error) {
 	args := []string{"build"}
 	args = append(args, a.BuildArgs...)
 	args = append(args, a.BuildTarget)
@@ -57,12 +57,21 @@ func (b *Builder) buildBazel(ctx context.Context, out io.Writer, workspace strin
 
 	ref := buildImageTag(a.BuildTarget)
 
-	imageID, err := b.localDocker.Load(ctx, out, imageTar, ref)
-	if err != nil {
+	if _, err = b.localDocker.Load(ctx, out, imageTar, ref); err != nil {
 		return "", errors.Wrap(err, "loading image into docker daemon")
 	}
 
-	return imageID, nil
+	if b.pushImages {
+		// TODO: We shouldn't load the image to the local Docker.
+		digest, err := b.localDocker.Push(ctx, out, fqn)
+		if err != nil {
+			return "", errors.Wrap(err, "pushing image")
+		}
+
+		return fmt.Sprintf("%s@%s", fqn, digest), nil
+	}
+
+	return fqn, nil
 }
 
 func bazelBin(ctx context.Context, workspace string) (string, error) {
