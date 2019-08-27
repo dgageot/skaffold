@@ -198,8 +198,10 @@ func (b *RunBuilder) RunOrFailOutput(t *testing.T) []byte {
 	t.Helper()
 
 	cmd := b.cmd(context.Background())
-	cmd.Stdout, cmd.Stderr = nil, nil
 	logrus.Infoln(cmd.Args)
+	cmd.Stdout = nil
+	stdErr := &bytes.Buffer{}
+	cmd.Stderr = stdErr
 
 	start := time.Now()
 	out, err := cmd.Output()
@@ -210,7 +212,13 @@ func (b *RunBuilder) RunOrFailOutput(t *testing.T) []byte {
 		t.Fatalf("skaffold %s: %v, %s", b.command, err, out)
 	}
 
+	// Always fail tests that produce a warning
+	if strings.Contains(stdErr.String(), " level=warning ") {
+		t.Fatalf("skaffold %s: %s, %s", b.command, out, stdErr.String())
+	}
+
 	logrus.Infoln("Ran in", time.Since(start))
+
 	return out
 }
 
