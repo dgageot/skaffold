@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/build/buildpacks"
 	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/docker"
 	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/initializer/build"
 	"github.com/GoogleContainerTools/skaffold/pkg/skaffold/schema/latest"
@@ -148,58 +147,6 @@ func TestGenerateSkaffoldConfig(t *testing.T) {
 	}
 }
 
-func TestArtifacts(t *testing.T) {
-	testutil.Run(t, "", func(t *testutil.T) {
-		artifacts := artifacts([]build.BuilderImagePair{
-			{
-				ImageName: "image1",
-				Builder: docker.ArtifactConfig{
-					File: "Dockerfile",
-				},
-			},
-			{
-				ImageName: "image2",
-				Builder: docker.ArtifactConfig{
-					File: "front/Dockerfile2",
-				},
-			},
-			{
-				ImageName: "image3",
-				Builder: buildpacks.ArtifactConfig{
-					File:    "package.json",
-					Builder: "some/builder",
-				},
-			},
-		})
-
-		expected := []*latest.Artifact{
-			{
-				ImageName:    "image1",
-				ArtifactType: latest.ArtifactType{},
-			},
-			{
-				ImageName: "image2",
-				Workspace: "front",
-				ArtifactType: latest.ArtifactType{
-					DockerArtifact: &latest.DockerArtifact{
-						DockerfilePath: "Dockerfile2",
-					},
-				},
-			},
-			{
-				ImageName: "image3",
-				ArtifactType: latest.ArtifactType{
-					BuildpackArtifact: &latest.BuildpackArtifact{
-						Builder: "some/builder",
-					},
-				},
-			},
-		}
-
-		t.CheckDeepEqual(expected, artifacts)
-	})
-}
-
 func Test_canonicalizeName(t *testing.T) {
 	const length253 = "aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa-aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa-aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaa"
 	tests := []struct {
@@ -238,4 +185,25 @@ func Test_canonicalizeName(t *testing.T) {
 			t.CheckDeepEqual(test.out, actual)
 		})
 	}
+}
+
+func artifacts(pairs []build.BuilderImagePair) []*latest.Artifact {
+	var artifacts []*latest.Artifact
+
+	for _, pair := range pairs {
+		artifact := &latest.Artifact{
+			ImageName: pair.ImageName,
+		}
+
+		workspace := filepath.Dir(pair.Builder.Path())
+		if workspace != "." {
+			artifact.Workspace = workspace
+		}
+
+		pair.Builder.UpdateArtifact(artifact)
+
+		artifacts = append(artifacts, artifact)
+	}
+
+	return artifacts
 }
