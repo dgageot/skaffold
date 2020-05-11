@@ -39,8 +39,7 @@ FLAGS=""
 if [[ "${TRAVIS}" == "true" ]]; then
     # Use less memory on Travis
     # See https://github.com/golangci/golangci-lint#memory-usage-of-golangci-lint
-    export GOGC=5
-    FLAGS="-j1 -v --print-resources-usage"
+    FLAGS="-v --print-resources-usage"
 fi
 
 $GOPATH/bin/golangci-lint run ${FLAGS} -c ${DIR}/golangci.yml \
