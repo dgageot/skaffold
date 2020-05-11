@@ -115,7 +115,7 @@ checks: $(BUILD_DIR)
 	@ ./hack/checks.sh
 
 .PHONY: linters
-checks: $(BUILD_DIR)
+linters: $(BUILD_DIR)
 	@ ./hack/linters.sh
 
 .PHONY: quicktest
