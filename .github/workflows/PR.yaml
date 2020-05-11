@@ -6,7 +6,5 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: lint
-        env:
-          BINDIR: /github/home/bin
-        run: ./hack/linter.sh
+        run: make linters
         continue-on-error: false
